@@ -77,11 +77,12 @@ class Settings(BaseSettings):
     PROMETHEUS_TIMEOUT_SECONDS: float = 5.0
 
     # Mosquitto MQTT
-    MQTT_HOST: str = "host.docker.internal"
+    MQTT_HOST: str = "192.168.25.101"
+    MQTT_TAILSCALE_HOST: str = "100.106.63.90"
     MQTT_PORT: int = 1883
-    MQTT_USERNAME: str = "REPLACE_ME"
-    MQTT_PASSWORD: str = "REPLACE_ME"
-    MQTT_ENABLED: bool = False
+    MQTT_USERNAME: str = "useriot"
+    MQTT_PASSWORD: str = "25022002"
+    MQTT_ENABLED: bool = True
 
     # Docker Executor (disabled by default in v1.0 per blueprint section 7.3 & 10.3)
     DOCKER_EXECUTOR_ENABLED: bool = False
@@ -93,6 +94,8 @@ class Settings(BaseSettings):
         default=(
             "http://192.168.25.101,http://192.168.25.101:3000,http://192.168.25.101:3001,"
             "http://192.168.25.101:3005,http://192.168.25.101:8088,"
+            "http://100.106.63.90,http://100.106.63.90:3000,http://100.106.63.90:3001,"
+            "http://100.106.63.90:3005,http://100.106.63.90:8000,http://100.106.63.90:8088,"
             "http://localhost:3000,http://localhost:3005,http://localhost:8088,"
             "http://127.0.0.1:3005,http://127.0.0.1:8088"
         )

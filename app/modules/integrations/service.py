@@ -363,6 +363,14 @@ class IntegrationService:
                 ],
                 "devices": fleet_service.list_fleet_devices(limit=100),
             },
+            "mqtt_broker": {
+                "local_host": settings.MQTT_HOST,
+                "tailscale_host": getattr(settings, "MQTT_TAILSCALE_HOST", "100.106.63.90"),
+                "port": settings.MQTT_PORT,
+                "username": settings.MQTT_USERNAME,
+                "status": "configured" if settings.MQTT_ENABLED else "disabled",
+                "enabled": settings.MQTT_ENABLED,
+            },
             "timestamp": datetime.now(timezone.utc).isoformat(),
         }
 

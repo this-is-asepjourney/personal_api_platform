@@ -313,11 +313,14 @@ def test_alembic_upgrade_and_downgrade(tmp_path):
     from alembic import command
     from alembic.config import Config
     from sqlalchemy import create_engine
+    from pathlib import Path
 
     db_file = tmp_path / "alembic_test.sqlite3"
     db_url = f"sqlite:///{db_file.as_posix()}"
 
-    alembic_cfg = Config("alembic.ini")
+    alembic_ini_path = Path(__file__).resolve().parents[2] / "alembic.ini"
+    alembic_cfg = Config(str(alembic_ini_path))
+    alembic_cfg.set_main_option("script_location", str(Path(__file__).resolve().parents[2] / "migrations"))
     alembic_cfg.set_main_option("sqlalchemy.url", db_url)
 
     command.upgrade(alembic_cfg, "head")
@@ -346,7 +349,7 @@ def test_three_projects_connected_via_pap_main_api(
     psm_headers = {"X-API-Key": settings.PAP_PSM_SERVICE_KEY}
     iot_headers = {"X-API-Key": settings.PAP_IOT_SERVICE_KEY}
 
-    # 1. Hub overview lists all connected projects and IoT Fleet summary
+    # 1. Hub overview lists all connected projects, IoT Fleet summary, and MQTT configuration
     hub_res = client.get("/api/v1/integrations/hub/overview", headers=psm_headers)
     assert hub_res.status_code == 200
     hub_data = hub_res.json()["data"]
@@ -355,6 +358,11 @@ def test_three_projects_connected_via_pap_main_api(
     assert "personal-server-manager" in project_slugs
     assert "iot-dashboard" in project_slugs
     assert hub_data["iot_dashboard"]["summary"]["total_devices"] >= 3
+    assert hub_data["mqtt_broker"]["local_host"] == "192.168.25.101"
+    assert hub_data["mqtt_broker"]["tailscale_host"] == "100.106.63.90"
+    assert hub_data["mqtt_broker"]["username"] == "useriot"
+    assert hub_data["mqtt_broker"]["port"] == 1883
+    assert hub_data["mqtt_broker"]["enabled"] is True
 
     # 2. Personal Server Manager pushes its live server/project/container state to PAP Main API
     sync_res = client.post(
