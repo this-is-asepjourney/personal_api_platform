@@ -110,6 +110,20 @@ def update_device(
     )
 
 
+@router.delete("/devices/{device_id}")
+def delete_device(
+    device_id: str,
+    principal: Principal = Depends(require_scopes("iot:manage")),
+    db: Session = Depends(get_db),
+):
+    service = IotService(db)
+    deleted = service.delete_device(device_id, principal)
+    return success_response(
+        data=deleted,
+        message="IoT device deleted successfully",
+    )
+
+
 @router.post("/devices/{device_id}/credentials/rotate")
 def rotate_device_credential(
     device_id: str,

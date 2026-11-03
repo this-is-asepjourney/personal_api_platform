@@ -12,9 +12,11 @@ from app.dependencies import require_any_scope, require_scopes
 from app.modules.integrations.schemas import (
     IntegrationCreate,
     IntegrationRead,
+    PsmSyncPayload,
     StockUmkmEventInput,
 )
 from app.modules.integrations.service import IntegrationService
+from app.modules.iot.fleet_router import FleetService
 from app.schemas import success_response
 
 router = APIRouter(prefix="/integrations", tags=["Business Integrations"])
@@ -85,6 +87,66 @@ def receive_stock_umkm_event(
     return success_response(
         data=result,
         message="Integration event processed successfully",
+    )
+
+
+@router.get("/hub/overview")
+def get_connected_projects_hub_overview(
+    principal: Principal = Depends(
+        require_any_scope("integrations:read", "projects:read", "server:read", "iot:read")
+    ),
+    db: Session = Depends(get_db),
+):
+    service = IntegrationService(db)
+    return success_response(
+        data=service.get_hub_overview(),
+        message="Connected projects hub overview retrieved successfully",
+    )
+
+
+@router.get("/psm/state")
+def get_psm_integration_state(
+    principal: Principal = Depends(
+        require_any_scope("server:read", "integrations:read", "projects:read")
+    ),
+    db: Session = Depends(get_db),
+):
+    service = IntegrationService(db)
+    return success_response(
+        data=service.get_psm_state(),
+        message="Personal Server Manager state retrieved successfully",
+    )
+
+
+@router.post("/psm/sync")
+def sync_psm_integration_state(
+    payload: PsmSyncPayload,
+    principal: Principal = Depends(
+        require_any_scope("server:read", "integrations:manage", "projects:manage")
+    ),
+    db: Session = Depends(get_db),
+):
+    service = IntegrationService(db)
+    return success_response(
+        data=service.sync_psm_state(payload, principal),
+        message="Personal Server Manager state synchronized with PAP Main API",
+    )
+
+
+@router.get("/iot-dashboard/fleet")
+def get_iot_dashboard_fleet_via_pap(
+    principal: Principal = Depends(
+        require_any_scope("iot:read", "metrics:read", "integrations:read")
+    ),
+    db: Session = Depends(get_db),
+):
+    fleet_service = FleetService(db)
+    return success_response(
+        data={
+            "stats": fleet_service.get_fleet_stats(),
+            "hierarchy": fleet_service.get_hierarchy(),
+        },
+        message="IoT Dashboard Heatpress fleet retrieved via PAP Main API",
     )
 
 

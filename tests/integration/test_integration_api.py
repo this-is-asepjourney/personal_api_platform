@@ -114,10 +114,11 @@ def test_auth_login_refresh_rotation_and_sessions(client: TestClient, db_session
 def test_bootstrap_projects_and_stock_umkm_pos_workflow(
     client: TestClient, db_session: Session, admin_headers: dict[str, str]
 ):
-    # Seed Phase 3 projects (Stock UMKM, POS Cashier, IoT Dashboard)
+    # Seed Phase 3 projects (Stock UMKM, POS Cashier, IoT Dashboard, Personal Server Manager)
     seed_result = seed_platform_registry(db_session)
-    assert seed_result["projects_created"] == 3
-    assert seed_result["clients_created"] == 3
+    assert seed_result["projects_created"] == 4
+    assert seed_result["clients_created"] == 4
+    assert seed_result["devices_seeded"] == 3
 
     # Issue an API key for POS Cashier backend client
     key_res = client.post(
@@ -278,9 +279,10 @@ def test_database_registry_metrics_monitoring_and_audit_logs(
     assert conns_res.status_code == 200
     conns = conns_res.json()["data"]
     assert len(conns) >= 1
-    conn_id = conns[0]["id"]
-    assert "password" not in conns[0]
-    assert conns[0]["secret_reference"] == "STOCK_DB_PASSWORD"
+    stock_conn = next(c for c in conns if c["name"] == "stock-umkm-mysql")
+    conn_id = stock_conn["id"]
+    assert "password" not in stock_conn
+    assert stock_conn["secret_reference"] == "STOCK_DB_PASSWORD"
 
     schema_res = client.get(
         f"/api/v1/database/sources/{conn_id}/schema?table=products",
@@ -331,4 +333,98 @@ def test_alembic_upgrade_and_downgrade(tmp_path):
     tables_after_downgrade = set(inspect(eng2).get_table_names())
     assert "users" not in tables_after_downgrade
     eng2.dispose()
+
+
+def test_three_projects_connected_via_pap_main_api(
+    client: TestClient, db_session: Session, admin_headers: dict[str, str]
+):
+    """Verify Personal Server Manager and IoT Dashboard communicate via PAP as the Main API."""
+    from app.core.config import settings
+
+    seed_platform_registry(db_session)
+
+    psm_headers = {"X-API-Key": settings.PAP_PSM_SERVICE_KEY}
+    iot_headers = {"X-API-Key": settings.PAP_IOT_SERVICE_KEY}
+
+    # 1. Hub overview lists all connected projects and IoT Fleet summary
+    hub_res = client.get("/api/v1/integrations/hub/overview", headers=psm_headers)
+    assert hub_res.status_code == 200
+    hub_data = hub_res.json()["data"]
+    assert hub_data["main_api"]["name"] == "Personal API Platform"
+    project_slugs = {p["slug"] for p in hub_data["connected_projects"]}
+    assert "personal-server-manager" in project_slugs
+    assert "iot-dashboard" in project_slugs
+    assert hub_data["iot_dashboard"]["summary"]["total_devices"] >= 3
+
+    # 2. Personal Server Manager pushes its live server/project/container state to PAP Main API
+    sync_res = client.post(
+        "/api/v1/integrations/psm/sync",
+        headers=psm_headers,
+        json={
+            "servers": [
+                {"id": 1, "name": "Homelab-Node-01", "hostname": "192.168.25.101", "status": "online"}
+            ],
+            "projects": [
+                {"id": 1, "name": "Personal API Platform", "slug": "personal-api-platform"},
+                {"id": 2, "name": "IoT Heatpress Dashboard", "slug": "iot-dashboard"},
+            ],
+            "containers": [
+                {"name": "pap-api", "status": "running"},
+                {"name": "heatpress_api", "status": "running"},
+            ],
+        },
+    )
+    assert sync_res.status_code == 200
+    assert sync_res.json()["data"]["status"] == "synced"
+    assert sync_res.json()["data"]["servers_count"] == 1
+
+    # PSM state endpoint returns the synchronized state
+    state_res = client.get("/api/v1/integrations/psm/state", headers=iot_headers)
+    assert state_res.status_code == 200
+    assert state_res.json()["data"]["servers"][0]["name"] == "Homelab-Node-01"
+
+    # 3. IoT Dashboard compatibility endpoints (/api/devices/*) and /api/v1/iot/fleet/* work seamlessly
+    hier_res = client.get("/api/devices/hierarchy")
+    assert hier_res.status_code == 200
+    hier = hier_res.json()
+    assert hier["category"] == "Heatpress"
+    model_names = {m["id"]: m for m in hier["models"]}
+    assert "HPM 55" in model_names
+    assert len(model_names["HPM 55"]["devices"]) >= 1
+
+    # Register a new Heatpress unit via /api/devices/ and verify it appears in PAP v1 IoT registry
+    create_dev = client.post(
+        "/api/devices/",
+        headers=iot_headers,
+        json={
+            "mac_address": "aa:bb:cc:dd:ee:ff",
+            "name": "HPM 55 Line 3",
+            "model": "HPM 55",
+            "category": "heatpress",
+        },
+    )
+    assert create_dev.status_code == 201
+    created_body = create_dev.json()
+    assert created_body["mac_address"] == "AA:BB:CC:DD:EE:FF"
+
+    # Update the device via /api/devices/{mac}
+    update_dev = client.put(
+        "/api/devices/AA:BB:CC:DD:EE:FF",
+        headers=iot_headers,
+        json={"name": "HPM 55 Line 3 Updated"},
+    )
+    assert update_dev.status_code == 200
+    assert update_dev.json()["name"] == "HPM 55 Line 3 Updated"
+
+    # Verify PSM can fetch the updated IoT fleet via PAP Main API
+    fleet_v1 = client.get("/api/v1/iot/fleet/hierarchy", headers=psm_headers)
+    assert fleet_v1.status_code == 200
+    v1_models = {m["id"]: m for m in fleet_v1.json()["data"]["models"]}
+    hpm_devices = v1_models["HPM 55"]["devices"]
+    assert any(d["mac_address"] == "AA:BB:CC:DD:EE:FF" and d["name"] == "HPM 55 Line 3 Updated" for d in hpm_devices)
+
+    # Delete the test device via /api/devices/{mac}
+    del_dev = client.delete("/api/devices/AA:BB:CC:DD:EE:FF", headers=iot_headers)
+    assert del_dev.status_code == 200
+
 

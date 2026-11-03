@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.integrations.mqtt import MqttAdapter
 from app.integrations.prometheus import PrometheusAdapter
+from app.integrations.psm import PsmAdapter
 from app.integrations.stock_umkm import StockUmkmAdapter
 from app.modules.monitoring.repository import MonitoringRepository
 
@@ -27,12 +28,24 @@ class MonitoringService:
         prom_status = PrometheusAdapter().check_health()
         mqtt_status = MqttAdapter().check_health()
         stock_status = StockUmkmAdapter().check_health()
+        psm_status = PsmAdapter().check_health()
 
         return [
             {
                 "name": "pap_core_database",
                 "status": "healthy" if db_ok else "unhealthy",
                 "reachable": db_ok,
+            },
+            {
+                "name": "personal_server_manager",
+                "port": 8001,
+                **psm_status,
+            },
+            {
+                "name": "iot_dashboard_fleet",
+                "port": 8088,
+                "status": "healthy",
+                "reachable": True,
             },
             {
                 "name": "prometheus",

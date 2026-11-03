@@ -57,6 +57,13 @@ class Settings(BaseSettings):
     # POS Cashier integration reference
     POS_CASHIER_WEBHOOK_URL: str = "http://192.168.25.101:3000/api/webhooks/pap"
 
+    # Connected Homelab Projects (PSM & IoT Dashboard) via PAP Main API
+    PSM_API_URL: str = "http://192.168.25.101:8001"
+    IOT_DASHBOARD_API_URL: str = "http://192.168.25.101:8002"
+    PAP_PSM_SERVICE_KEY: str = "pap_key_psm_control_plane_default_secret_key_2026"
+    PAP_IOT_SERVICE_KEY: str = "pap_key_iot_dashboard_default_secret_key_2026"
+    ONLINE_THRESHOLD_MINUTES: int = 5
+
     # Authentication & JWT
     JWT_SECRET: str = "dev-only-jwt-secret-key-change-in-production-32b"
     JWT_ISSUER: str = "personal-api-platform"
@@ -83,7 +90,12 @@ class Settings(BaseSettings):
     # Security & Rate limiting
     RATE_LIMIT_REQUESTS_PER_MINUTE: int = 120
     CORS_ORIGINS: str = Field(
-        default="http://192.168.25.101,http://192.168.25.101:3000,http://192.168.25.101:3001"
+        default=(
+            "http://192.168.25.101,http://192.168.25.101:3000,http://192.168.25.101:3001,"
+            "http://192.168.25.101:3005,http://192.168.25.101:8088,"
+            "http://localhost:3000,http://localhost:3005,http://localhost:8088,"
+            "http://127.0.0.1:3005,http://127.0.0.1:8088"
+        )
     )
 
     @property
@@ -130,4 +142,8 @@ class Settings(BaseSettings):
 @lru_cache
 def get_settings() -> Settings:
     return Settings()
+
+
+settings = get_settings()
+
 

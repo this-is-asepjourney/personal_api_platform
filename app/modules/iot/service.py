@@ -122,6 +122,25 @@ class IotService:
         )
         return updated
 
+    def delete_device(self, identifier: str, principal: Principal) -> dict[str, Any]:
+        device = self.get_device(identifier, principal)
+        info = {
+            "id": str(device.id),
+            "device_uid": device.device_uid,
+            "name": device.name,
+            "project_id": str(device.project_id),
+        }
+        self.repo.delete_device(device)
+        self.audit.record(
+            action="iot.device_deleted",
+            resource="devices",
+            resource_id=info["id"],
+            project_id=device.project_id,
+            principal=principal,
+            details={"device_uid": info["device_uid"]},
+        )
+        return info
+
     def rotate_credential(
         self, identifier: str, principal: Principal
     ) -> tuple[Device, DeviceCredential, str]:

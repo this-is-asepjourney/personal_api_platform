@@ -12,10 +12,18 @@ class IntegrationCreate(BaseModel):
     name: str = Field(..., min_length=2, max_length=128)
     integration_type: str = Field(
         ...,
-        pattern=r"^(laravel_api|mysql_readonly|pos_backend|prometheus|mqtt|custom)$",
+        pattern=r"^(laravel_api|mysql_readonly|pos_backend|prometheus|mqtt|psm_api|iot_dashboard|custom)$",
     )
     configuration: dict[str, Any] = Field(default_factory=dict)
     secret_reference: Optional[str] = Field(default=None, max_length=128)
+
+
+class PsmSyncPayload(BaseModel):
+    source: str = Field(default="personal-server-manager")
+    servers: list[dict[str, Any]] = Field(default_factory=list)
+    containers: list[dict[str, Any]] = Field(default_factory=list)
+    projects: list[dict[str, Any]] = Field(default_factory=list)
+    resources: dict[str, Any] = Field(default_factory=dict)
 
 
 class IntegrationRead(BaseModel):

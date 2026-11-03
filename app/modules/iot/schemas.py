@@ -9,7 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 class DeviceCreate(BaseModel):
     project_id: uuid.UUID
-    device_uid: str = Field(..., min_length=3, max_length=128, pattern=r"^[a-zA-Z0-9][a-zA-Z0-9\-_]*$")
+    device_uid: str = Field(..., min_length=3, max_length=128, pattern=r"^[a-zA-Z0-9][a-zA-Z0-9\-_:]*$")
     name: str = Field(default="", max_length=255)
     device_type: str = Field(default="esp32", min_length=2, max_length=64)
     metadata: dict[str, Any] = Field(default_factory=dict)

@@ -41,6 +41,10 @@ class IotRepository:
         self.db.refresh(device)
         return device
 
+    def delete_device(self, device: Device) -> None:
+        self.db.delete(device)
+        self.db.commit()
+
     def create_credential(self, cred: DeviceCredential) -> DeviceCredential:
         self.db.add(cred)
         self.db.commit()
